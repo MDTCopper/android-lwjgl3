@@ -5,10 +5,11 @@ name: Build LWJGL natives for Android
 # One dispatch builds every ABI in parallel, then publishes one stable-named
 # archive per ABI to a GitHub release named after the LWJGL version.
 #
-# The Android NDK is fetched as a standalone zip instead of going through
-# android-actions/setup-android + sdkmanager: the setup-android action still
-# tries to install the long-removed legacy "tools" package and fails with
-# "Failed to find package 'tools'". A plain zip also pins the exact revision.
+# The Android NDK is taken from the runner's preinstalled Android SDK
+# (<sdk>/ndk/<revision>, verified through source.properties), so no SDK
+# component is downloaded. android-actions/setup-android is deliberately not
+# used: it still tries to install the long-removed legacy "tools" package and
+# fails with "Failed to find package 'tools'".
 
 on:
   workflow_dispatch:
@@ -46,25 +47,37 @@ jobs:
           sudo apt update
           sudo apt -y install autoconf automake libtool zip unzip
 
-      - name: Install Android NDK
+      - name: Locate the pinned Android NDK
         run: |
           set -euo pipefail
-          NDK_HOME="$RUNNER_TEMP/android-ndk-${NDK_RELEASE}"
-          if [ ! -d "$NDK_HOME" ]; then
-            curl -fL --retry 3 -o "$RUNNER_TEMP/ndk.zip" \
-              "https://dl.google.com/android/repository/android-ndk-${NDK_RELEASE}-linux.zip"
-            unzip -q "$RUNNER_TEMP/ndk.zip" -d "$RUNNER_TEMP"
-            rm -f "$RUNNER_TEMP/ndk.zip"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME:-<unset>}  (ignored unless it is ${NDK_VERSION})"
+          ls -1 "${ANDROID_SDK_ROOT:-/nonexistent}/ndk" 2>/dev/null || true
+
+          # The runner image already ships NDK ${NDK_VERSION} inside the Android
+          # SDK, so nothing has to be downloaded. The standalone archive is only
+          # a fallback for a future image that drops it.
+          NDK_PATH="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}/ndk/${NDK_VERSION}"
+          if [ ! -d "$NDK_PATH" ]; then
+            echo "::warning::NDK ${NDK_VERSION} is not preinstalled, downloading the standalone archive"
+            NDK_PATH="$RUNNER_TEMP/android-ndk-${NDK_RELEASE}"
+            if [ ! -d "$NDK_PATH" ]; then
+              curl -fL --retry 3 -o "$RUNNER_TEMP/ndk.zip" \
+                "https://dl.google.com/android/repository/android-ndk-${NDK_RELEASE}-linux.zip"
+              unzip -q "$RUNNER_TEMP/ndk.zip" -d "$RUNNER_TEMP"
+              rm -f "$RUNNER_TEMP/ndk.zip"
+            fi
           fi
-          # The runner image also ships an NDK of a *different* revision, so
-          # prove that the one we are about to build with is the pinned one.
-          grep -q "^Pkg.Revision = ${NDK_VERSION}$" "$NDK_HOME/source.properties" || {
-            echo "::error::$NDK_HOME is not NDK ${NDK_VERSION}"
+
+          # The image also exports ANDROID_NDK_HOME for a *different* default
+          # revision; prove that the one we build with is the pinned one.
+          grep -q "^Pkg.Revision = ${NDK_VERSION}$" "$NDK_PATH/source.properties" || {
+            echo "::error::$NDK_PATH is not NDK ${NDK_VERSION}"
             exit 1
           }
-          echo "NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
-          echo "using $NDK_HOME"
-          "$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" --version
+          echo "NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "using $NDK_PATH"
+          "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" --version
 
       - name: Build natives
         run: ./scripts/build.sh --abi "${{ matrix.abi }}" --outdir dist

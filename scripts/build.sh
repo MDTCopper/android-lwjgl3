@@ -89,22 +89,57 @@ ndk_host_tag() {
     esac
 }
 
+# An Android SDK install ships source.properties with e.g.
+#     Pkg.Revision = 29.0.14206865
+# GitHub's runner images preinstall several NDK revisions and export
+# ANDROID_NDK_HOME pointing at the default one, which is usually NOT the revision
+# we pin. Never silently build with the wrong toolchain.
+ndk_revision_matches() {
+    local root="$1"
+    [[ -n "$root" && -f "$root/source.properties" ]] || return 1
+    grep -q "^Pkg.Revision = ${NDK_VERSION}$" "$root/source.properties"
+}
+
 resolve_ndk() {
     local candidate
-    for candidate in "${NDK_HOME:-}" "${ANDROID_NDK_HOME:-}" \
-                     "${ANDROID_NDK_ROOT:-}" \
-                     "${ANDROID_SDK_ROOT:-}/ndk/${NDK_VERSION}" \
-                     "${ANDROID_HOME:-}/ndk/${NDK_VERSION}"; do
-        if [[ -n "$candidate" && -d "$candidate" ]]; then
+
+    # An explicitly configured NDK is honoured, but only if it really is the
+    # pinned revision (SKIP_NDK_VERSION_CHECK=1 forces it through).
+    for candidate in "${NDK_HOME:-}" "${ANDROID_NDK_HOME:-}" "${ANDROID_NDK_ROOT:-}"; do
+        [[ -n "$candidate" && -d "$candidate" ]] || continue
+        if ndk_revision_matches "$candidate"; then
             (cd "$candidate" && pwd)
             return 0
         fi
+        if [[ "${SKIP_NDK_VERSION_CHECK:-0}" == "1" ]]; then
+            warn "using $candidate despite the revision mismatch (SKIP_NDK_VERSION_CHECK=1)"
+            (cd "$candidate" && pwd)
+            return 0
+        fi
+        warn "ignoring $candidate: it is not NDK $NDK_VERSION"
     done
+
+    # SDK style installs: <sdk>/ndk/<revision>
+    for candidate in \
+        "${ANDROID_SDK_ROOT:-}/ndk/${NDK_VERSION}" \
+        "${ANDROID_HOME:-}/ndk/${NDK_VERSION}"; do
+        [[ -n "$candidate" && -d "$candidate" ]] || continue
+        if ndk_revision_matches "$candidate"; then
+            (cd "$candidate" && pwd)
+            return 0
+        fi
+        warn "ignoring $candidate: Pkg.Revision does not match $NDK_VERSION"
+    done
+
     return 1
 }
 
 if ! NDK_ROOT="$(resolve_ndk)"; then
-    die "Android NDK ${NDK_VERSION} not found. Set NDK_HOME, or point ANDROID_SDK_ROOT at an SDK with ndk/${NDK_VERSION} installed."
+    die "Android NDK ${NDK_VERSION} not found.
+       Looked at \$NDK_HOME, \$ANDROID_NDK_HOME, \$ANDROID_NDK_ROOT and
+       \$ANDROID_SDK_ROOT/ndk/${NDK_VERSION}. On GitHub runners the SDK ships
+       this revision already; locally set NDK_HOME to it, or install it with
+       'sdkmanager --install \"ndk;${NDK_VERSION}\"'."
 fi
 
 NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/$(ndk_host_tag)/bin"

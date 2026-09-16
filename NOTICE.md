@@ -62,7 +62,7 @@ libffi 3.6.0 introduced `FFI_TYPE_UINT128` / `FFI_TYPE_SINT128`, which changes `
 - Project: <https://developer.android.com/ndk>
 - License: Android NDK License — <https://developer.android.com/ndk/downloads>
 
-Used as the cross-compilation toolchain (clang 21 / LLD 21). Not redistributed by this repository; the CI workflow installs it through `sdkmanager`.
+Used as the cross-compilation toolchain (clang 21 / LLD 21). Not redistributed by this repository: the CI workflow uses the revision that GitHub's runner images already install inside the Android SDK, and verifies `Pkg.Revision` before building.
 
 The NDK sysroot also supplies the `jni.h` used to compile the LWJGL sources, so no JDK headers are needed.
 

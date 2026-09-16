@@ -50,17 +50,15 @@ The release notes list every component version and revision, and embed the full 
 
 ### On GitHub Actions
 
-| Trigger | Behaviour |
-| --- | --- |
-| `workflow_dispatch` | manual build; publishes a release by default |
-| push of a `3.*` tag | builds and publishes the release for that tag |
-| push to `main` / `master` | builds and uploads workflow artifacts only (validation) |
+The workflow is **manual only** — pushing never starts a build. Run *Build LWJGL natives for Android* from the Actions tab; leave `publish_release` ticked to refresh the release, or untick it to build artifacts without touching a release.
 
-The three ABIs are built in parallel on separate runners; only after all of them succeed does the `release` job collect the archives, write `SHA256SUMS.txt` and publish the release.
+The three ABIs are built in parallel on separate runners; only after all of them succeed does the `release` job collect the archives, write `SHA256SUMS.txt` and publish the release named after the LWJGL version.
+
+The NDK is **not downloaded**: GitHub's Ubuntu images already install `29.0.14206865` inside the Android SDK at `<sdk>/ndk/<revision>`, and the workflow verifies `Pkg.Revision` before building. Those images also export `ANDROID_NDK_HOME` for a different default revision; that one is ignored. A standalone NDK zip is only fetched as a fallback if a future image stops shipping the pinned revision.
 
 ### Locally
 
-Requirements: `git`, `make`, `zip`, `autoconf`/`automake`/`libtool`, and NDK `29.0.14206865`.
+Requirements: `git`, `make`, `zip`, `autoconf`/`automake`/`libtool`, and NDK `29.0.14206865`. `build.sh` searches `NDK_HOME`, `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT` and `<sdk>/ndk/<revision>`, and rejects any candidate whose `source.properties` does not report `Pkg.Revision = 29.0.14206865` (set `SKIP_NDK_VERSION_CHECK=1` to override).
 
 ```bash
 export ANDROID_SDK_ROOT=/path/to/android-sdk     # containing ndk/29.0.14206865
