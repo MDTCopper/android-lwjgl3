@@ -71,7 +71,8 @@ jobs:
 
           # The image also exports ANDROID_NDK_HOME for a *different* default
           # revision; prove that the one we build with is the pinned one.
-          grep -q "^Pkg.Revision = ${NDK_VERSION}$" "$NDK_PATH/source.properties" || {
+          # -x -F: whole line, literal (the dots in the revision are not a regex).
+          grep -qxF "Pkg.Revision = ${NDK_VERSION}" "$NDK_PATH/source.properties" || {
             echo "::error::$NDK_PATH is not NDK ${NDK_VERSION}"
             exit 1
           }

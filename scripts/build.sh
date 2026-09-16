@@ -96,8 +96,13 @@ ndk_host_tag() {
 # we pin. Never silently build with the wrong toolchain.
 ndk_revision_matches() {
     local root="$1"
-    [[ -n "$root" && -f "$root/source.properties" ]] || return 1
-    grep -q "^Pkg.Revision = ${NDK_VERSION}$" "$root/source.properties"
+    # Reject anything that is not a usable NDK for some host ...
+    [[ -n "$root" && -d "$root/toolchains/llvm/prebuilt" ]] || return 1
+    # ... and fail closed when the metadata is missing: without source.properties
+    # the revision cannot be proven, so the candidate is not trusted. Both the
+    # Android SDK install and the standalone archive ship this file.
+    [[ -f "$root/source.properties" ]] || return 1
+    grep -qxF "Pkg.Revision = ${NDK_VERSION}" "$root/source.properties"
 }
 
 resolve_ndk() {
