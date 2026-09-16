@@ -1,0 +1,11 @@
+# The build scripts run on Linux (GitHub Actions). Force LF everywhere so a
+# Windows checkout with core.autocrlf=true cannot turn "#!/usr/bin/env bash"
+# into "#!/usr/bin/env bash\r" and break the scripts.
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.bash  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf

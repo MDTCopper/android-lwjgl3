@@ -1,0 +1,12 @@
+# Build outputs
+/build/
+/dist/
+
+# Local NDK / SDK checkouts
+/.ndk/
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
