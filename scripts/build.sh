@@ -64,6 +64,8 @@ abi_supported "$ABI" || die "unsupported ABI '$ABI' (supported: ${ALL_ABIS[*]})"
 
 require_cmd git
 require_cmd make
+require_cmd curl
+require_cmd tar
 
 # sha256sum (coreutils) on Linux, shasum on macOS.
 hash_file() {
@@ -191,6 +193,9 @@ info "libffi      : $LIBFFI_VERSION ($LIBFFI_COMMIT)"
 
 # ---------------------------------------------------------------------------
 # 1. Fetch and verify upstream sources
+#
+# LWJGL is checked out at a pinned commit; libffi comes from its release
+# tarball, pinned by SHA-256 (see scripts/common.sh for why not a git checkout).
 # ---------------------------------------------------------------------------
 
 fetch_lwjgl() {
@@ -223,15 +228,28 @@ fetch_lwjgl() {
 
 fetch_libffi() {
     local dest="$SRC_DIR/libffi"
-    if [[ ! -d "$dest/.git" ]]; then
-        info "cloning libffi v$LIBFFI_VERSION"
-        git clone --depth 1 --branch "v$LIBFFI_VERSION" "$LIBFFI_REPO" "$dest" >&2
+    local tarball="$SRC_DIR/libffi-${LIBFFI_VERSION}.tar.gz"
+
+    # Only a tree that actually carries the generated configure script is
+    # reusable; a leftover checkout (this used to be a git clone) is not.
+    if [[ ! -f "$dest/configure" ]]; then
+        if [[ ! -f "$tarball" ]]; then
+            info "downloading the libffi $LIBFFI_VERSION release tarball"
+            curl -fL --retry 3 -o "$tarball" "$LIBFFI_TARBALL_URL" >&2
+        fi
+
+        local actual
+        actual="$(hash_file "$tarball" | tr 'a-f' 'A-F')"
+        [[ "$actual" == "$LIBFFI_TARBALL_SHA256" ]] || die \
+            "libffi tarball sha256 mismatch (expected $LIBFFI_TARBALL_SHA256, got $actual)"
+
+        rm -rf "$dest" "$SRC_DIR/libffi-$LIBFFI_VERSION"
+        tar -xzf "$tarball" -C "$SRC_DIR"
+        mv "$SRC_DIR/libffi-$LIBFFI_VERSION" "$dest"
     fi
-    local actual
-    actual="$(git -C "$dest" rev-parse HEAD)"
-    [[ "$actual" == "$LIBFFI_COMMIT" ]] || die \
-        "libffi checkout is at $actual, expected v$LIBFFI_VERSION == $LIBFFI_COMMIT"
-    info "libffi sources verified at $LIBFFI_COMMIT"
+
+    [[ -f "$dest/configure" ]] || die "libffi configure script is missing in $dest"
+    info "libffi $LIBFFI_VERSION sources ready (tarball sha256 verified == tag v$LIBFFI_VERSION $LIBFFI_COMMIT)"
     echo "$dest"
 }
 
@@ -253,13 +271,6 @@ build_libffi() {
     if [[ -f "$LIBFFI_PREFIX/lib/libffi.a" ]]; then
         info "libffi.a already built for $ABI"
         return 0
-    fi
-
-    if [[ ! -x "$LIBFFI_SRC/configure" ]]; then
-        require_cmd autoreconf
-        info "generating libffi configure script"
-        ( cd "$LIBFFI_SRC" && ./autogen.sh ) >"$BUILD_DIR/libffi-autogen.log" 2>&1 ||
-            { tail -n 40 "$BUILD_DIR/libffi-autogen.log" >&2; die "libffi autogen.sh failed"; }
     fi
 
     mkdir -p "$LIBFFI_BUILD" "$LIBFFI_PREFIX"
@@ -504,7 +515,9 @@ LWJGL modules        : lwjgl (core), lwjgl-opengles
 Resource path        : linux/$LWJGL_ARCH/org/lwjgl/
 
 libffi version       : $LIBFFI_VERSION
-libffi source        : $LIBFFI_REPO @ $LIBFFI_COMMIT
+libffi tarball       : $LIBFFI_TARBALL_URL
+libffi tarball sha256: $LIBFFI_TARBALL_SHA256
+libffi tag/commit    : v$LIBFFI_VERSION @ $LIBFFI_COMMIT
 
 Compile flags        : ${CORE_CFLAGS[*]}
 Link flags           : ${LINK_COMMON[*]} -Wl,-soname,...

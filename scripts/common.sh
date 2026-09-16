@@ -23,9 +23,18 @@ LWJGL_REPO="https://github.com/LWJGL/lwjgl3.git"
 #     #define FFI_TYPE_LAST       FFI_TYPE_COMPLEX
 # libffi 3.6.0 added FFI_TYPE_UINT128/SINT128 (changing FFI_TYPE_LAST), so the
 # static library must stay on the 3.5.x ABI line.
+#
+# The *release tarball* is used instead of a git checkout: libffi 3.5.0's
+# configure.ac requires autoconf >= 2.72, while the CI images ship 2.71 (both
+# Ubuntu 22.04 and 24.04), so autoreconf cannot regenerate ./configure there.
+# The tarball carries a maintainer-generated configure, and every source file in
+# it is byte-identical to tag v3.5.0, so the SHA-256 below pins exactly the same
+# content as the commit does.
 LIBFFI_VERSION="3.5.0"
 LIBFFI_COMMIT="d2c78d2ebbd9e65401095c6a2f281fe5132f028b"
 LIBFFI_REPO="https://github.com/libffi/libffi.git"
+LIBFFI_TARBALL_URL="https://github.com/libffi/libffi/releases/download/v${LIBFFI_VERSION}/libffi-${LIBFFI_VERSION}.tar.gz"
+LIBFFI_TARBALL_SHA256="8C72678628A5DD8782F08AD421D5A441E42C1C5C1B33E0BC211CBFCF1F3B3978"
 
 # ---------------------------------------------------------------------------
 # 2. Target configuration

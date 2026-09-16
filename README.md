@@ -58,7 +58,7 @@ The NDK is **not downloaded**: GitHub's Ubuntu images already install `29.0.1420
 
 ### Locally
 
-Requirements: `git`, `make`, `zip`, `autoconf`/`automake`/`libtool`, and NDK `29.0.14206865`. `build.sh` searches `NDK_HOME`, `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT` and `<sdk>/ndk/<revision>`, and rejects any candidate whose `source.properties` does not report `Pkg.Revision = 29.0.14206865` (set `SKIP_NDK_VERSION_CHECK=1` to override).
+Requirements: `git`, `make`, `tar`, `curl`, `zip`, and NDK `29.0.14206865`. No autotools are needed: libffi comes from its release tarball, which ships a pre-generated `configure`. `build.sh` searches `NDK_HOME`, `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT` and `<sdk>/ndk/<revision>`, and rejects any candidate whose `source.properties` does not report `Pkg.Revision = 29.0.14206865` (set `SKIP_NDK_VERSION_CHECK=1` to override).
 
 ```bash
 export ANDROID_SDK_ROOT=/path/to/android-sdk     # containing ndk/29.0.14206865
@@ -123,15 +123,17 @@ Note on #6: earlier hand-made arm64 artifacts carried a redundant `liblog.so` `N
 
 ## Pinned versions and provenance
 
-Every upstream input is pinned to an immutable commit which is verified during the build; any mismatch fails the build immediately.
+Every upstream input is pinned and verified during the build; any mismatch fails the build immediately.
 
-| Component | Version | Revision |
+| Component | Version | Pinned by |
 | --- | --- | --- |
-| LWJGL | 3.4.1 | `b800ccffab14396fc529ddb6c931b7c5c5226763` |
-| libffi | 3.5.0 | `d2c78d2ebbd9e65401095c6a2f281fe5132f028b` |
-| Android NDK | 29.0.14206865 | Google release |
+| LWJGL | 3.4.1 | git tag, verified against commit `b800ccffab14396fc529ddb6c931b7c5c5226763` |
+| libffi | 3.5.0 | release tarball, verified against SHA-256 `8c72678628a5dd8782f08ad421d5a441e42c1c5c1b33e0bc211cbfcf1f3b3978` |
+| Android NDK | 29.0.14206865 | `Pkg.Revision` in `source.properties` |
 
-In addition to the commit check, specific LWJGL files the recipe depends on are verified by SHA-256 (see `pin_paths` / `pin_sha256` in `scripts/common.sh`), and the number of translation units is asserted (24 for core, 135 for OpenGL ES), so upstream drift fails loudly instead of silently changing the output.
+libffi is taken from its **release tarball** rather than a git checkout because libffi 3.5.0's `configure.ac` requires autoconf ≥ 2.72, while the CI images ship 2.71 (Ubuntu 22.04 and 24.04 both), so `autoreconf` cannot regenerate `./configure` there. The tarball carries a maintainer-generated `configure`, and its sources were compared file by file against tag `v3.5.0` (`d2c78d2ebbd9e65401095c6a2f281fe5132f028b`) and match byte for byte.
+
+In addition to those checks, specific LWJGL files the recipe depends on are verified by SHA-256 (see `pin_paths` / `pin_sha256` in `scripts/common.sh`), and the number of translation units is asserted (24 for core, 135 for OpenGL ES), so upstream drift fails loudly instead of silently changing the output.
 
 **The libffi version must not be bumped casually.** LWJGL 3.4.1 vendors its own `ffi.h`, which hard-codes:
 
@@ -146,7 +148,7 @@ libffi 3.6.0 added `FFI_TYPE_UINT128` / `FFI_TYPE_SINT128`, which changes `FFI_T
 ### Upgrading LWJGL
 
 1. Update `LWJGL_VERSION` and `LWJGL_COMMIT` in `scripts/common.sh`.
-2. If `modules/lwjgl/core/src/main/c/libffi/ffi.h` changed, re-derive the libffi version/commit from the `FFI_VERSION_STRING` / `FFI_VERSION_NUMBER` it declares.
+2. If `modules/lwjgl/core/src/main/c/libffi/ffi.h` changed, re-derive the libffi version from the `FFI_VERSION_STRING` / `FFI_VERSION_NUMBER` it declares, then update `LIBFFI_TARBALL_URL`, `LIBFFI_TARBALL_SHA256` and `LIBFFI_COMMIT` in `scripts/common.sh`.
 3. Refresh `pin_paths` / `pin_sha256` with `sha256sum`.
 4. Adjust the translation-unit count assertions in `scripts/build.sh` if sources were added or removed.
 5. Update the default `lwjgl_version` of the `workflow_dispatch` input in `.github/workflows/build.yml`.

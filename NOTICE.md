@@ -39,7 +39,7 @@ The core module additionally embeds these bundled third-party sources:
 ## libffi 3.5.0
 
 - Project: <https://github.com/libffi/libffi>
-- Revision: `d2c78d2ebbd9e65401095c6a2f281fe5132f028b` (tag `v3.5.0`)
+- Revision: tag `v3.5.0` (`d2c78d2ebbd9e65401095c6a2f281fe5132f028b`), built from the release tarball `libffi-3.5.0.tar.gz` pinned by SHA-256 `8c72678628a5dd8782f08ad421d5a441e42c1c5c1b33e0bc211cbfcf1f3b3978`. Its sources were compared file by file against the tag and match byte for byte.
 - Copyright: Copyright (c) 1996-2020 Anthony Green, Red Hat, Inc and others
 - License: MIT — see `modules/lwjgl/core/libffi_license.txt` in the LWJGL tree
 

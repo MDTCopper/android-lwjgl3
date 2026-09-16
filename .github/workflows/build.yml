@@ -45,7 +45,10 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt update
-          sudo apt -y install autoconf automake libtool zip unzip
+          # No autotools: libffi comes from its release tarball, which ships a
+          # pre-generated configure. libffi 3.5.0 needs autoconf >= 2.72 and the
+          # images only have 2.71, so autoreconf cannot be used at all.
+          sudo apt -y install zip unzip
 
       - name: Locate the pinned Android NDK
         run: |
